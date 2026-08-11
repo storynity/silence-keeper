@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Silence Keeper | Study Cafe Kiosk</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main class="app">
+      <header class="topbar">
+        <div class="brand-block">
+          <p class="eyebrow">ICDC 2026 / STUDY CAFE KIOSK</p>
+          <h1>Silence Keeper</h1>
+          <p class="subtitle">Choose a seat by seeing its current sound level.</p>
+        </div>
+        <div class="legend" aria-label="Noise level legend">
+          <span><i class="dot quiet"></i>Quiet &lt; 40dB</span>
+          <span><i class="dot yellow"></i>Attention 40–50dB</span>
+          <span><i class="dot red"></i>Loud ≥ 50dB</span>
+          <span><i class="dot offline"></i>Offline</span>
+        </div>
+      </header>
+
+      <section class="dashboard">
+        <div id="map" class="map offline" aria-label="Study cafe floor plan and seat noise map">
+          <div class="floorplan">
+            <div class="floorplan-title"><span>STUDY CAFE FLOOR PLAN</span><strong>Live seat conditions</strong></div>
+
+            <div class="room room-restroom"><span>RESTROOM</span></div>
+            <div class="room room-kiosk"><strong>KIOSK</strong><span>Seat selection</span><i></i></div>
+            <div class="room room-storage"><span>Storage</span></div>
+            <div class="room room-lounge"><span>Lounge</span></div>
+            <div class="room room-stairs"><span>STAIRS</span><b></b></div>
+            <div class="room room-study-a"><span>Study room A</span><small>Reserved room</small></div>
+            <div class="room room-study-b"><span>Study room B</span><small>Reserved room</small></div>
+            <div class="room room-corridor"><span>MAIN CORRIDOR</span></div>
+            <div class="room room-entry"><span>ENTRY</span></div>
+
+            <section class="seat-room room-zone-s1 offline" data-zone-seats="S1">
+              <div class="seat-room-heading"><strong>ZONE A</strong><span>North-left</span></div>
+              <div class="seat-grid"></div>
+            </section>
+            <section class="seat-room room-zone-s2 offline" data-zone-seats="S2">
+              <div class="seat-room-heading"><strong>ZONE B</strong><span>North-right</span></div>
+              <div class="seat-grid"></div>
+            </section>
+            <section class="seat-room room-zone-s3 offline" data-zone-seats="S3">
+              <div class="seat-room-heading"><strong>ZONE C</strong><span>South-left</span></div>
+              <div class="seat-grid"></div>
+            </section>
+            <section class="seat-room room-zone-s4 offline" data-zone-seats="S4">
+              <div class="seat-room-heading"><strong>ZONE D</strong><span>South-right</span></div>
+              <div class="seat-grid"></div>
+            </section>
+          </div>
+
+          <div id="hotspot" class="hotspot"><span></span></div>
+          <div class="map-footer">
+            <span><i class="map-pin"></i>Estimated loudest area</span>
+            <span id="x-label">x --cm</span>
+            <span id="y-label">y --cm</span>
+          </div>
+        </div>
+
+        <aside class="panel">
+          <div class="panel-heading">
+            <div><span class="section-kicker">KIOSK VIEW</span><h2>Live overview</h2></div>
+            <span class="live-pill"><i></i>LIVE</span>
+          </div>
+
+          <div id="estimate" class="estimate offline">
+            <span>Highest current level</span>
+            <strong id="overall-db">-- dB</strong>
+            <b id="source-label">No signal</b>
+            <em id="active-count">0 of 4 zones active</em>
+          </div>
+
+          <div class="zone-summary">
+            <div><span>Noisiest zone</span><strong id="noisiest-zone">No signal</strong></div>
+            <div><span>Quietest zone</span><strong id="quietest-zone">No signal</strong></div>
+          </div>
+
+          <div class="section-heading"><span>Seat conditions</span><small>10s rolling average</small></div>
+          <div id="sensor-list" class="sensor-list"></div>
+        </aside>
+      </section>
+    </main>
+
+    <script>
+      const statusClass = {
+        QUIET: "quiet",
+        GREEN: "quiet",
+        YELLOW: "yellow",
+        RED: "red",
+        OFFLINE: "offline",
+      };
+
+      const statusColor = {
+        QUIET: "#edf5f1",
+        GREEN: "#edf5f1",
+        YELLOW: "#f2b84b",
+        RED: "#ef5a58",
+        OFFLINE: "#7d8792",
+      };
+
+      const seatNumbers = {
+        S1: [1, 2, 3, 4, 5, 6],
+        S2: [7, 8, 9, 10, 11, 12],
+        S3: [13, 14, 15, 16, 17, 18],
+        S4: [19, 20, 21, 22, 23, 24],
+      };
+
+      function formatDb(value) {
+        return value === null || value === undefined ? "-- dB" : `${Number(value).toFixed(1)} dB`;
+      }
+
+      function setStatusClass(element, status) {
+        element.classList.remove("quiet", "green", "yellow", "red", "offline");
+        element.classList.add(statusClass[status] || "offline");
+      }
+
+      function buildSeatMap() {
+        document.querySelectorAll("[data-zone-seats]").forEach((group) => {
+          const zone = group.dataset.zoneSeats;
+          const grid = group.querySelector(".seat-grid");
+          grid.innerHTML = (seatNumbers[zone] || []).map((number) => `
+            <div class="seat" data-seat="${number}">
+              <strong>${number}</strong><span class="seat-db">--</span>
+            </div>
+          `).join("");
+        });
+      }
+
+      function updateSeatZones(sensors) {
+        document.querySelectorAll("[data-zone-seats]").forEach((group) => {
+          const sensor = sensors[group.dataset.zoneSeats];
+          if (!sensor) return;
+          setStatusClass(group, sensor.status);
+          group.querySelectorAll(".seat").forEach((seat) => {
+            setStatusClass(seat, sensor.status);
+            seat.querySelector(".seat-db").textContent = sensor.avg_db === null ? "--" : `${Number(sensor.avg_db).toFixed(0)}dB`;
+          });
+        });
+      }
+
+      function updateSensorBox(sensor, data) {
+        const box = document.querySelector(`[data-sensor="${sensor}"]`);
+        if (!box) return;
+        setStatusClass(box, data.status);
+        box.querySelector(".db").textContent = formatDb(data.avg_db);
+      }
+
+      function renderSensorList(sensors) {
+        const list = document.getElementById("sensor-list");
+        list.innerHTML = "";
+        Object.values(sensors).forEach((sensor) => {
+          const row = document.createElement("div");
+          row.className = `sensor-row ${statusClass[sensor.status] || "offline"}`;
+          row.innerHTML = `
+            <div class="sensor-row-name"><strong>${sensor.name}</strong><span>${sensor.label}</span></div>
+            <div class="sensor-row-value"><b>${formatDb(sensor.avg_db)}</b><small>${sensor.status === "QUIET" ? "Quiet" : sensor.status}</small></div>
+          `;
+          list.appendChild(row);
+        });
+      }
+
+      function updateMap(map, tableWidthCm, tableDepthCm) {
+        const mapEl = document.getElementById("map");
+        const estimate = document.getElementById("estimate");
+        const hotspot = document.getElementById("hotspot");
+        const status = map.status || "OFFLINE";
+        const color = statusColor[status] || statusColor.OFFLINE;
+
+        setStatusClass(mapEl, status);
+        setStatusClass(estimate, status);
+        mapEl.style.setProperty("--hotspot-x", `${map.hotspot_x_percent ?? 50}%`);
+        mapEl.style.setProperty("--hotspot-y", `${map.hotspot_y_percent ?? 50}%`);
+        mapEl.style.setProperty("--hotspot-color", color);
+        hotspot.querySelector("span").textContent = status === "OFFLINE" ? "" : formatDb(map.overall_avg_db);
+
+        document.getElementById("overall-db").textContent = formatDb(map.overall_avg_db);
+        document.getElementById("source-label").textContent = map.source_label || "No signal";
+        document.getElementById("active-count").textContent = `${map.active_sensor_count || 0} of 4 zones active`;
+        document.getElementById("noisiest-zone").textContent = map.noisiest_zone || "No signal";
+        document.getElementById("quietest-zone").textContent = map.quietest_zone || "No signal";
+        document.getElementById("x-label").textContent = map.estimated_x_cm === null || map.estimated_x_cm === undefined ? "x --cm" : `x ${map.estimated_x_cm}cm from left`;
+        document.getElementById("y-label").textContent = map.estimated_y_cm === null || map.estimated_y_cm === undefined ? "y --cm" : `y ${map.estimated_y_cm}cm from front`;
+      }
+
+      async function refresh() {
+        try {
+          const response = await fetch("/api/state", { cache: "no-store" });
+          const data = await response.json();
+          Object.entries(data.sensors).forEach(([sensor, sensorData]) => updateSensorBox(sensor, sensorData));
+          updateSeatZones(data.sensors);
+          updateMap(data.map, data.table_width_cm, data.table_depth_cm);
+          renderSensorList(data.sensors);
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      buildSeatMap();
+      refresh();
+      setInterval(refresh, 1000);
+    </script>
+  </body>
+</html>
