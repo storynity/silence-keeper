@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import math
-import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -28,39 +27,6 @@ SENSORS = {
     "S3": {"name": "S3", "label": "Wall-left", "x_cm": 25.0, "y_cm": 20.0},
     "S4": {"name": "S4", "label": "Wall-right", "x_cm": 155.0, "y_cm": 20.0},
 }
-# ==========================================
-# Automatic sensor assignment
-# First connected device -> S1
-# Second connected device -> S2
-# Third connected device -> S3
-# Fourth connected device -> S4
-# ==========================================
-
-DEVICE_ASSIGNMENTS = {}
-
-SENSOR_ORDER = ["S1", "S2", "S3", "S4"]
-
-
-def assign_sensor(device_id):
-    # Already assigned device
-    if device_id in DEVICE_ASSIGNMENTS:
-        return DEVICE_ASSIGNMENTS[device_id]
-
-    # No more available sensor slots
-    if len(DEVICE_ASSIGNMENTS) >= len(SENSOR_ORDER):
-        return None
-
-    # Assign the next available sensor
-    sensor_id = SENSOR_ORDER[len(DEVICE_ASSIGNMENTS)]
-
-    DEVICE_ASSIGNMENTS[device_id] = sensor_id
-
-    print(
-        f"New device assigned: "
-        f"{device_id} -> {sensor_id}"
-    )
-
-    return sensor_id
 
 SENSOR_ALIASES = {
     "A": "S1",
@@ -348,25 +314,12 @@ class SilenceKeeperHandler(BaseHTTPRequestHandler):
             self.send_json(400, {"ok": False, "error": "Invalid JSON"})
             return
 
-        device_id = str(payload.get("device_id", "")).strip()
-
-        if not device_id:
-            self.send_json(
-                400,
-                {"ok": False, "error": "device_id is required"}
-            )
-            return
-
-        sensor = assign_sensor(device_id)
+        sensor = normalize_sensor(payload.get("zone") or payload.get("sensor"))
+        node_id = str(payload.get("node_id", "UNKNOWN"))
 
         if sensor is None:
-            self.send_json(
-                409,
-                {"ok": False, "error": "All 4 sensor slots are already assigned"}
-            )
+            self.send_json(400, {"ok": False, "error": "Unknown sensor. Use S1, S2, S3, or S4."})
             return
-
-        node_id = device_id
 
         try:
             db = float(payload.get("db"))
@@ -402,8 +355,7 @@ class SilenceKeeperHandler(BaseHTTPRequestHandler):
 
 
 def run() -> None:
-    port = int(os.environ.get("PORT", 5000))
-    server = ThreadingHTTPServer(("0.0.0.0", port), SilenceKeeperHandler)
+    server = ThreadingHTTPServer(("0.0.0.0", 5000), SilenceKeeperHandler)
     print("Silence Keeper server running")
     print("Dashboard: http://localhost:5000")
     print("ESP32 URL: http://YOUR_LAPTOP_IP:5000")
