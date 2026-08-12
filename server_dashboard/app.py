@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+import os
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -27,6 +28,28 @@ SENSORS = {
     "S3": {"name": "S3", "label": "Wall-left", "x_cm": 25.0, "y_cm": 20.0},
     "S4": {"name": "S4", "label": "Wall-right", "x_cm": 155.0, "y_cm": 20.0},
 }
+
+# Automatic assignment by first contact order.
+# First unique device_id -> S1, second -> S2, third -> S3, fourth -> S4.
+DEVICE_ASSIGNMENTS: dict[str, str] = {}
+SENSOR_ORDER = ["S1", "S2", "S3", "S4"]
+assignment_lock = Lock()
+
+
+def assign_sensor(device_id: str) -> str | None:
+    """Return the stable S1-S4 assignment for this device_id."""
+    with assignment_lock:
+        if device_id in DEVICE_ASSIGNMENTS:
+            return DEVICE_ASSIGNMENTS[device_id]
+
+        if len(DEVICE_ASSIGNMENTS) >= len(SENSOR_ORDER):
+            return None
+
+        sensor_id = SENSOR_ORDER[len(DEVICE_ASSIGNMENTS)]
+        DEVICE_ASSIGNMENTS[device_id] = sensor_id
+        print(f"New device assigned: {device_id} -> {sensor_id}")
+        return sensor_id
+
 
 SENSOR_ALIASES = {
     "A": "S1",
@@ -314,12 +337,30 @@ class SilenceKeeperHandler(BaseHTTPRequestHandler):
             self.send_json(400, {"ok": False, "error": "Invalid JSON"})
             return
 
-        sensor = normalize_sensor(payload.get("zone") or payload.get("sensor"))
-        node_id = str(payload.get("node_id", "UNKNOWN"))
+        # New ESP32 code sends a unique device_id (for example its MAC address).
+        # The server assigns S1-S4 by the order in which unique devices first contact it.
+        device_id = str(payload.get("device_id", "")).strip()
 
-        if sensor is None:
-            self.send_json(400, {"ok": False, "error": "Unknown sensor. Use S1, S2, S3, or S4."})
-            return
+        if device_id:
+            sensor = assign_sensor(device_id)
+            if sensor is None:
+                self.send_json(
+                    409,
+                    {"ok": False, "error": "All 4 sensor slots are already assigned"},
+                )
+                return
+            node_id = device_id
+        else:
+            # Backward compatibility with the previous ESP32 payload format.
+            sensor = normalize_sensor(payload.get("zone") or payload.get("sensor"))
+            node_id = str(payload.get("node_id", "UNKNOWN"))
+
+            if sensor is None:
+                self.send_json(
+                    400,
+                    {"ok": False, "error": "device_id is required, or use a legacy S1-S4 zone"},
+                )
+                return
 
         try:
             db = float(payload.get("db"))
@@ -355,10 +396,11 @@ class SilenceKeeperHandler(BaseHTTPRequestHandler):
 
 
 def run() -> None:
-    server = ThreadingHTTPServer(("0.0.0.0", 5000), SilenceKeeperHandler)
+    port = int(os.environ.get("PORT", 5000))
+    server = ThreadingHTTPServer(("0.0.0.0", port), SilenceKeeperHandler)
     print("Silence Keeper server running")
-    print("Dashboard: http://localhost:5000")
-    print("ESP32 URL: http://YOUR_LAPTOP_IP:5000")
+    print(f"Dashboard: http://localhost:{port}")
+    print("ESP32 URL: http://YOUR_LAPTOP_IP:%d" % port)
     server.serve_forever()
 
 
