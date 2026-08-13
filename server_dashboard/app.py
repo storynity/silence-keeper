@@ -324,6 +324,18 @@ class SilenceKeeperHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = urlparse(self.path).path
 
+        if path == "/api/reset-assignments":
+            with assignment_lock:
+                DEVICE_ASSIGNMENTS.clear()
+
+            with lock:
+                for sensor in sensor_history:
+                    sensor_history[sensor].clear()
+
+            print("Device assignments reset")
+            self.send_json(200, {"ok": True, "message": "Device assignments reset"})
+            return
+
         if path != "/api/noise":
             self.send_body(404, "Not found\n", "text/plain; charset=utf-8")
             return
