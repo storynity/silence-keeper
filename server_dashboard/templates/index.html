@@ -25,6 +25,7 @@
       <section class="dashboard">
         <div id="map" class="map offline" aria-label="Study cafe floor plan and seat noise map">
           <div class="floorplan">
+            <canvas id="contour-canvas"></canvas>
             <div class="floorplan-title"><span>STUDY CAFE FLOOR PLAN</span><strong>Live seat conditions</strong></div>
 
             <div class="room room-restroom"><span>RESTROOM</span></div>
@@ -164,6 +165,455 @@
           list.appendChild(row);
         });
       }
+      // ========================================
+// Smooth Noise Contour Map
+// S1 = 左上 / S2 = 右上
+// S3 = 左下 / S4 = 右下
+// ========================================
+
+function renderContourMap(sensors) {
+  const canvas = document.getElementById("contour-canvas");
+  const floorplan = document.querySelector(".floorplan");
+
+  if (!canvas || !floorplan) return;
+
+  const width = floorplan.clientWidth;
+  const height = floorplan.clientHeight;
+
+  // 高解像度ディスプレイ対応
+  const dpr = window.devicePixelRatio || 1;
+
+  canvas.width = Math.round(width * dpr);
+  canvas.height = Math.round(height * dpr);
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width, height);
+
+  const db = {
+    S1: sensors.S1?.avg_db,
+    S2: sensors.S2?.avg_db,
+    S3: sensors.S3?.avg_db,
+    S4: sensors.S4?.avg_db
+  };
+
+  // 4台そろっていない場合は描画しない
+  if (
+    db.S1 == null ||
+    db.S2 == null ||
+    db.S3 == null ||
+    db.S4 == null
+  ) {
+    return;
+  }
+
+  /*
+    センサーを画面の四隅ギリギリではなく、
+    少し内側に置いたものとして計算する。
+
+    TABLEの物理サイズは無視。
+  */
+  const sensorPoints = [
+    {
+      x: width * 0.36,
+      y: height * 0.31,
+      db: Number(db.S1)
+    },
+    {
+      x: width * 0.78,
+      y: height * 0.31,
+      db: Number(db.S2)
+    },
+    {
+      x: width * 0.36,
+      y: height * 0.73,
+      db: Number(db.S3)
+    },
+    {
+      x: width * 0.78,
+      y: height * 0.73,
+      db: Number(db.S4)
+    }
+  ];
+
+  /*
+    計算用グリッド。
+    数字を小さくすると滑らかになるが重くなる。
+    7pxなら十分軽くて滑らか。
+  */
+  const gridSize = 4;
+
+  const cols = Math.ceil(width / gridSize) + 1;
+  const rows = Math.ceil(height / gridSize) + 1;
+
+  const field = Array.from(
+    { length: rows },
+    () => new Array(cols).fill(0)
+  );
+
+  /*
+    IDW (Inverse Distance Weighting)
+
+    センサーに近いほど、そのセンサーのdB値を
+    強く反映する。
+  */
+  function estimateDb(x, y) {
+    let weightedSum = 0;
+    let totalWeight = 0;
+
+    for (const sensor of sensorPoints) {
+      const dx = x - sensor.x;
+      const dy = y - sensor.y;
+
+      const distanceSquared =
+        dx * dx + dy * dy;
+
+      // センサー位置そのもの
+      if (distanceSquared < 1) {
+        return sensor.db;
+      }
+
+      /*
+        1.65くらいにすると
+        急すぎず滑らかな地形になる
+      */
+      const distance =
+        Math.sqrt(distanceSquared);
+
+      const weight =
+        1 / Math.pow(distance, 1.65);
+
+      weightedSum += sensor.db * weight;
+      totalWeight += weight;
+    }
+
+    return weightedSum / totalWeight;
+  }
+
+
+  // 面全体の推定dBを作る
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = col * gridSize;
+      const y = row * gridSize;
+
+      field[row][col] =
+        estimateDb(x, y);
+    }
+  }
+
+
+  // ========================================
+  // 薄い背景色
+  // ========================================
+
+  const minDb = 35;
+  const maxDb = 60;
+
+  function colorForDb(value) {
+
+  // 静か：緑
+  if (value <= 40) {
+    const t = Math.max(0, (value - 30) / 10);
+
+    return [
+      Math.round(205 - 65 * t),
+      Math.round(240 - 15 * t),
+      Math.round(215 - 65 * t)
+    ];
+  }
+
+  // 40〜45：緑 → 黄
+  if (value <= 45) {
+    const t = (value - 40) / 5;
+
+    return [
+      Math.round(140 + 100 * t),
+      Math.round(225 - 20 * t),
+      Math.round(150 - 80 * t)
+    ];
+  }
+
+  // 45〜50：黄 → オレンジ
+  if (value <= 50) {
+    const t = (value - 45) / 5;
+
+    return [
+      Math.round(240),
+      Math.round(205 - 80 * t),
+      Math.round(70 - 5 * t)
+    ];
+  }
+
+  // 50以上：オレンジ → 赤
+  const t = Math.min(1, (value - 50) / 10);
+
+  return [
+    Math.round(240 - 15 * t),
+    Math.round(125 - 75 * t),
+    Math.round(65 + 15 * t)
+  ];
+}
+
+
+  /*
+    背景をかなり薄く塗る。
+    「線だけがいい」なら
+    この背景描画部分を後で消せる。
+  */
+
+
+  // ========================================
+  // Marching Squares
+  // 等高線を作る
+  // ========================================
+
+  const sensorValues = sensorPoints.map(sensor => sensor.db);
+
+const actualMinDb = Math.min(...sensorValues);
+const actualMaxDb = Math.max(...sensorValues);
+
+const contourCount = 10;
+
+// 値の差が小さくても10本程度作る
+const contourStep =
+  (actualMaxDb - actualMinDb) / (contourCount + 1);
+
+const levels = [];
+
+if (contourStep > 0.001) {
+  for (let i = 1; i <= contourCount; i++) {
+    const value =
+      actualMinDb + contourStep * i;
+
+    const [r, g, b] = colorForDb(value);
+
+    levels.push({
+      value,
+      color: `rgba(${r}, ${g}, ${b}, 0.85)`
+    });
+  }
+}
+
+
+  function interpolate(
+    x1,
+    y1,
+    v1,
+    x2,
+    y2,
+    v2,
+    level
+  ) {
+    if (Math.abs(v2 - v1) < 0.0001) {
+      return {
+        x: (x1 + x2) / 2,
+        y: (y1 + y2) / 2
+      };
+    }
+
+    const t =
+      (level - v1) /
+      (v2 - v1);
+
+    return {
+      x: x1 + (x2 - x1) * t,
+      y: y1 + (y2 - y1) * t
+    };
+  }
+
+
+  for (const contour of levels) {
+    const level = contour.value;
+
+    ctx.beginPath();
+    ctx.strokeStyle = contour.color;
+    ctx.lineWidth = 1.4;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    for (let row = 0; row < rows - 1; row++) {
+      for (let col = 0; col < cols - 1; col++) {
+
+        const x =
+          col * gridSize;
+
+        const y =
+          row * gridSize;
+
+        const vTL =
+          field[row][col];
+
+        const vTR =
+          field[row][col + 1];
+
+        const vBR =
+          field[row + 1][col + 1];
+
+        const vBL =
+          field[row + 1][col];
+
+        const points = [];
+
+
+        // 上辺
+        if (
+          (vTL < level && vTR >= level) ||
+          (vTL >= level && vTR < level)
+        ) {
+          points.push(
+            interpolate(
+              x,
+              y,
+              vTL,
+              x + gridSize,
+              y,
+              vTR,
+              level
+            )
+          );
+        }
+
+
+        // 右辺
+        if (
+          (vTR < level && vBR >= level) ||
+          (vTR >= level && vBR < level)
+        ) {
+          points.push(
+            interpolate(
+              x + gridSize,
+              y,
+              vTR,
+              x + gridSize,
+              y + gridSize,
+              vBR,
+              level
+            )
+          );
+        }
+
+
+        // 下辺
+        if (
+          (vBL < level && vBR >= level) ||
+          (vBL >= level && vBR < level)
+        ) {
+          points.push(
+            interpolate(
+              x,
+              y + gridSize,
+              vBL,
+              x + gridSize,
+              y + gridSize,
+              vBR,
+              level
+            )
+          );
+        }
+
+
+        // 左辺
+        if (
+          (vTL < level && vBL >= level) ||
+          (vTL >= level && vBL < level)
+        ) {
+          points.push(
+            interpolate(
+              x,
+              y,
+              vTL,
+              x,
+              y + gridSize,
+              vBL,
+              level
+            )
+          );
+        }
+
+
+        if (points.length === 2) {
+          ctx.moveTo(
+            points[0].x,
+            points[0].y
+          );
+
+          ctx.lineTo(
+            points[1].x,
+            points[1].y
+          );
+        }
+
+        /*
+          特殊ケース。
+          1マスに4交点できた場合。
+        */
+        if (points.length === 4) {
+          ctx.moveTo(
+            points[0].x,
+            points[0].y
+          );
+
+          ctx.lineTo(
+            points[1].x,
+            points[1].y
+          );
+
+          ctx.moveTo(
+            points[2].x,
+            points[2].y
+          );
+
+          ctx.lineTo(
+            points[3].x,
+            points[3].y
+          );
+        }
+      }
+    }
+
+    ctx.stroke();
+  }
+
+
+  // ========================================
+  // センサー位置を小さく表示
+  // ========================================
+
+  sensorPoints.forEach(
+    (sensor, index) => {
+
+      ctx.beginPath();
+
+      ctx.arc(
+        sensor.x,
+        sensor.y,
+        4,
+        0,
+        Math.PI * 2
+      );
+
+      ctx.fillStyle =
+        "rgba(50,60,60,0.7)";
+
+      ctx.fill();
+
+
+      ctx.font =
+        "bold 10px Arial";
+
+      ctx.fillStyle =
+        "rgba(50,60,60,0.78)";
+
+      ctx.fillText(
+        `S${index + 1}`,
+        sensor.x + 7,
+        sensor.y - 7
+      );
+    }
+  );
+}
 
       function updateMap(map, tableWidthCm, tableDepthCm) {
         const mapEl = document.getElementById("map");
@@ -194,6 +644,7 @@
           const data = await response.json();
           Object.entries(data.sensors).forEach(([sensor, sensorData]) => updateSensorBox(sensor, sensorData));
           updateSeatZones(data.sensors);
+          renderContourMap(data.sensors);
           updateMap(data.map, data.table_width_cm, data.table_depth_cm);
           renderSensorList(data.sensors);
         } catch (error) {
