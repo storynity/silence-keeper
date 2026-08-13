@@ -253,3 +253,49 @@ h2 { font-size: 21px; letter-spacing: 0; }
   background:
     rgba(255, 255, 255, 0.78);
 }
+/* ========================================
+   Smooth Noise Contour Map
+   ======================================== */
+
+#contour-canvas {
+  position: absolute;
+  inset: 0;
+
+  width: 100%;
+  height: 100%;
+
+  z-index: 3;
+
+  pointer-events: none;
+
+  opacity: 0.65;
+}
+
+/* 部屋や文字を等高線より上に表示 */
+.floorplan-title {
+  z-index: 8;
+}
+
+.room {
+  z-index: 7;
+}
+
+/* Zoneは透明にして等高線を見せる */
+.seat-room {
+  z-index: 7;
+  background: rgba(255, 255, 255, 0.35);
+}
+
+.seat-room.quiet,
+.seat-room.yellow,
+.seat-room.red,
+.seat-room.offline {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* 座席は読みやすくする */
+.seat {
+  position: relative;
+  z-index: 8;
+  background: rgba(255, 255, 255, 0.78);
+}
