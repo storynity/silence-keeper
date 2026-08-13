@@ -190,52 +190,49 @@ function renderContourMap(sensors) {
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
+////////
+  const sensorPoints = [];
 
-  const db = {
-    S1: sensors.S1?.avg_db,
-    S2: sensors.S2?.avg_db,
-    S3: sensors.S3?.avg_db,
-    S4: sensors.S4?.avg_db
-  };
+if (sensors.S1?.avg_db != null) {
+  sensorPoints.push({
+    x: width * 0.36,
+    y: height * 0.31,
+    db: Number(sensors.S1.avg_db),
+    name: "S1"
+  });
+}
 
-  // 4台そろっていない場合は描画しない
-  if (
-    db.S1 == null ||
-    db.S2 == null ||
-    db.S3 == null ||
-    db.S4 == null
-  ) {
-    return;
-  }
+if (sensors.S2?.avg_db != null) {
+  sensorPoints.push({
+    x: width * 0.78,
+    y: height * 0.31,
+    db: Number(sensors.S2.avg_db),
+    name: "S2"
+  });
+}
 
-  /*
-    センサーを画面の四隅ギリギリではなく、
-    少し内側に置いたものとして計算する。
+if (sensors.S3?.avg_db != null) {
+  sensorPoints.push({
+    x: width * 0.36,
+    y: height * 0.73,
+    db: Number(sensors.S3.avg_db),
+    name: "S3"
+  });
+}
 
-    TABLEの物理サイズは無視。
-  */
-  const sensorPoints = [
-    {
-      x: width * 0.36,
-      y: height * 0.31,
-      db: Number(db.S1)
-    },
-    {
-      x: width * 0.78,
-      y: height * 0.31,
-      db: Number(db.S2)
-    },
-    {
-      x: width * 0.36,
-      y: height * 0.73,
-      db: Number(db.S3)
-    },
-    {
-      x: width * 0.78,
-      y: height * 0.73,
-      db: Number(db.S4)
-    }
-  ];
+if (sensors.S4?.avg_db != null) {
+  sensorPoints.push({
+    x: width * 0.78,
+    y: height * 0.73,
+    db: Number(sensors.S4.avg_db),
+    name: "S4"
+  });
+}
+
+// 2台未満なら等高線は作れない
+if (sensorPoints.length < 2) {
+  return;
+}
 
   /*
     計算用グリッド。
@@ -607,7 +604,7 @@ if (contourStep > 0.001) {
         "rgba(50,60,60,0.78)";
 
       ctx.fillText(
-        `S${index + 1}`,
+        sensor.name,
         sensor.x + 7,
         sensor.y - 7
       );
