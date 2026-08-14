@@ -15,9 +15,9 @@
           <p class="subtitle">Choose a seat by seeing its current sound level.</p>
         </div>
         <div class="legend" aria-label="Noise level legend">
-          <span><i class="dot quiet"></i>Quiet &lt; 40dB</span>
-          <span><i class="dot yellow"></i>Attention 40–50dB</span>
-          <span><i class="dot red"></i>Loud ≥ 50dB</span>
+          <span><i class="dot quiet"></i>Quiet &lt; 70dB</span>
+          <span><i class="dot yellow"></i>Attention 70–80dB</span>
+          <span><i class="dot red"></i>Loud ≥ 80dB</span>
           <span><i class="dot offline"></i>Offline</span>
         </div>
       </header>
@@ -299,9 +299,9 @@ if (sensorPoints.length < 2) {
 
   function colorForDb(value) {
 
-  // 静か：緑
-  if (value <= 40) {
-    const t = Math.max(0, (value - 30) / 10);
+  // 70 dB未満：静か
+  if (value < 70) {
+    const t = Math.max(0, Math.min(1, (value - 50) / 20));
 
     return [
       Math.round(205 - 65 * t),
@@ -310,35 +310,24 @@ if (sensorPoints.length < 2) {
     ];
   }
 
-  // 40〜45：緑 → 黄
-  if (value <= 45) {
-    const t = (value - 40) / 5;
+  // 70〜80 dB未満：黄色
+  if (value < 80) {
+    const t = (value - 70) / 10;
 
     return [
-      Math.round(140 + 100 * t),
-      Math.round(225 - 20 * t),
-      Math.round(150 - 80 * t)
+      242,
+      Math.round(184 - 55 * t),
+      Math.round(75 - 10 * t)
     ];
   }
 
-  // 45〜50：黄 → オレンジ
-  if (value <= 50) {
-    const t = (value - 45) / 5;
-
-    return [
-      Math.round(240),
-      Math.round(205 - 80 * t),
-      Math.round(70 - 5 * t)
-    ];
-  }
-
-  // 50以上：オレンジ → 赤
-  const t = Math.min(1, (value - 50) / 10);
+  // 80 dB以上：赤
+  const t = Math.min(1, (value - 80) / 10);
 
   return [
-    Math.round(240 - 15 * t),
-    Math.round(125 - 75 * t),
-    Math.round(65 + 15 * t)
+    Math.round(239 - 14 * t),
+    Math.round(90 - 40 * t),
+    Math.round(88 - 8 * t)
   ];
 }
 
