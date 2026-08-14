@@ -151,6 +151,42 @@ h2 { font-size: 21px; letter-spacing: 0; }
 .map-footer span { white-space: nowrap; }
 .map-pin { display: inline-block; width: 8px; height: 8px; margin-right: 5px; border-radius: 50%; background: var(--red); }
 
+/* Fixed markers showing each device's physical measuring point, drawn
+   above the seat grid (not on the canvas) so they stay visible no matter
+   what color the zone/seats are showing. Positions match the contour
+   map's sensorPoints coordinates (36/31%, 78/31%, 65/73%). */
+.sensor-marker {
+  position: absolute;
+  z-index: 9;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: #202f35;
+  border: 2px solid #fff;
+  box-shadow: 0 3px 9px rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.sensor-marker::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid rgba(32, 47, 53, 0.35);
+}
+.sensor-marker span { font-size: 9px; font-weight: 800; letter-spacing: 0.2px; color: #fff; }
+.sensor-marker-s1 { left: 47.5%; top: 41%; }
+.sensor-marker-s2 { left: 81%; top: 41%; }
+.sensor-marker-s3 { left: 65%; top: 82%; }
+
+@media (max-width: 620px) {
+  .sensor-marker { width: 20px; height: 20px; }
+  .sensor-marker span { font-size: 8px; }
+}
+
 .panel { min-width: 0; padding: 20px; border: 1px solid #2f454c; border-radius: 10px; background: var(--panel); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18); }
 .panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .live-pill { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid #2b6e60; border-radius: 999px; color: #7bd5b7; font-size: 10px; font-weight: 700; letter-spacing: 1px; }
