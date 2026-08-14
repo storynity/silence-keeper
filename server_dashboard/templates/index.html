@@ -47,13 +47,12 @@
               <div class="seat-grid"></div>
             </section>
             <section class="seat-room room-zone-s3 offline" data-zone-seats="S3">
-              <div class="seat-room-heading"><strong>ZONE C</strong><span>South-left</span></div>
-              <div class="seat-grid"></div>
-            </section>
-            <section class="seat-room room-zone-s4 offline" data-zone-seats="S4">
-              <div class="seat-room-heading"><strong>ZONE D</strong><span>South-right</span></div>
-              <div class="seat-grid"></div>
-            </section>
+              <div class="seat-room-heading">
+                <strong>ZONE C</strong>
+                <span>South area</span>
+              </div>
+            <div class="seat-grid"></div>
+          </section>
           </div>
 
           <div id="hotspot" class="hotspot"><span></span></div>
@@ -74,7 +73,7 @@
             <span>Highest current level</span>
             <strong id="overall-db">-- dB</strong>
             <b id="source-label">No signal</b>
-            <em id="active-count">0 of 4 zones active</em>
+            <em id="active-count">0 of 3 zones active</em>
           </div>
 
           <div class="zone-summary">
@@ -109,7 +108,6 @@
         S1: [1, 2, 3, 4, 5, 6],
         S2: [7, 8, 9, 10, 11, 12],
         S3: [13, 14, 15, 16, 17, 18],
-        S4: [19, 20, 21, 22, 23, 24],
       };
 
       function formatDb(value) {
@@ -213,19 +211,10 @@ if (sensors.S2?.avg_db != null) {
 
 if (sensors.S3?.avg_db != null) {
   sensorPoints.push({
-    x: width * 0.36,
+    x: width * 0.65,
     y: height * 0.73,
     db: Number(sensors.S3.avg_db),
     name: "S3"
-  });
-}
-
-if (sensors.S4?.avg_db != null) {
-  sensorPoints.push({
-    x: width * 0.78,
-    y: height * 0.73,
-    db: Number(sensors.S4.avg_db),
-    name: "S4"
   });
 }
 
@@ -628,7 +617,7 @@ if (contourStep > 0.001) {
 
         document.getElementById("overall-db").textContent = formatDb(map.overall_avg_db);
         document.getElementById("source-label").textContent = map.source_label || "No signal";
-        document.getElementById("active-count").textContent = `${map.active_sensor_count || 0} of 4 zones active`;
+        document.getElementById("active-count").textContent = `${map.active_sensor_count || 0} of 3 zones active`;
         document.getElementById("noisiest-zone").textContent = map.noisiest_zone || "No signal";
         document.getElementById("quietest-zone").textContent = map.quietest_zone || "No signal";
         document.getElementById("x-label").textContent = map.estimated_x_cm === null || map.estimated_x_cm === undefined ? "x --cm" : `x ${map.estimated_x_cm}cm from left`;
