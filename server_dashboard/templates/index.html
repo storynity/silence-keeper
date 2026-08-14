@@ -7,6 +7,52 @@
     <link rel="stylesheet" href="/static/style.css">
   </head>
   <body>
+    <div class="manager-controls">
+      <button id="manager-btn" class="manager-btn" type="button">Manager Page</button>
+      <button id="log-toggle-btn" class="manager-btn manager-log hidden" type="button">Log</button>
+      <button id="reset-assignments-btn" class="manager-btn manager-reset hidden" type="button">Reset Devices</button>
+      <button id="manager-logout-btn" class="manager-btn manager-logout hidden" type="button">Logout</button>
+    </div>
+
+    <div id="passcode-modal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>Manager Login</h3>
+        <p>Enter the manager passcode to view notifications.</p>
+        <input id="passcode-input" type="password" inputmode="numeric" maxlength="6" placeholder="Passcode" autocomplete="off">
+        <div id="passcode-error" class="modal-error"></div>
+        <div class="modal-actions">
+          <button id="passcode-cancel" type="button">Cancel</button>
+          <button id="passcode-submit" type="button" class="primary">Unlock</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="notify-panel" class="notify-panel hidden">
+      <div class="notify-panel-heading">
+        <strong>MANAGER ALERTS</strong>
+        <div class="notify-panel-actions">
+          <button id="notify-clear" type="button">Clear</button>
+          <button id="notify-close" type="button" aria-label="Close">&times;</button>
+        </div>
+      </div>
+      <div id="notify-list" class="notify-list">
+        <div class="notify-empty">No notifications yet.</div>
+      </div>
+    </div>
+
+    <div id="confirm-modal" class="modal-overlay hidden">
+      <div class="modal-card confirm-card">
+        <h3>Delete all notification logs?</h3>
+        <p>This will permanently remove every entry from the Manager Alerts log. This cannot be undone.</p>
+        <div class="modal-actions confirm-actions">
+          <button id="confirm-no" type="button">No</button>
+          <button id="confirm-ok" type="button" class="primary danger">OK</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-stack" class="toast-stack" aria-live="polite"></div>
+
     <main class="app">
       <header class="topbar">
         <div class="brand-block">
@@ -16,8 +62,8 @@
         </div>
         <div class="legend" aria-label="Noise level legend">
           <span><i class="dot quiet"></i>Quiet &lt; 70dB</span>
-          <span><i class="dot yellow"></i>Attention 70–80dB</span>
-          <span><i class="dot red"></i>Loud ≥ 80dB</span>
+          <span><i class="dot yellow"></i>Attention 70–75dB</span>
+          <span><i class="dot red"></i>Loud ≥ 75dB</span>
           <span><i class="dot offline"></i>Offline</span>
         </div>
       </header>
@@ -51,8 +97,8 @@
                 <strong>ZONE C</strong>
                 <span>South area</span>
               </div>
-            <div class="seat-grid"></div>
-          </section>
+              <div class="seat-grid"></div>
+            </section>
           </div>
 
           <div id="hotspot" class="hotspot"><span></span></div>
@@ -166,7 +212,7 @@
       // ========================================
 // Smooth Noise Contour Map
 // S1 = 左上 / S2 = 右上
-// S3 = 左下 / S4 = 右下
+// S3 = 中央下
 // ========================================
 
 function renderContourMap(sensors) {
@@ -188,40 +234,40 @@ function renderContourMap(sensors) {
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, width, height);
-////////
+
   const sensorPoints = [];
 
-if (sensors.S1?.avg_db != null) {
-  sensorPoints.push({
-    x: width * 0.36,
-    y: height * 0.31,
-    db: Number(sensors.S1.avg_db),
-    name: "S1"
-  });
-}
+  if (sensors.S1?.avg_db != null) {
+    sensorPoints.push({
+      x: width * 0.36,
+      y: height * 0.31,
+      db: Number(sensors.S1.avg_db),
+      name: "S1"
+    });
+  }
 
-if (sensors.S2?.avg_db != null) {
-  sensorPoints.push({
-    x: width * 0.78,
-    y: height * 0.31,
-    db: Number(sensors.S2.avg_db),
-    name: "S2"
-  });
-}
+  if (sensors.S2?.avg_db != null) {
+    sensorPoints.push({
+      x: width * 0.78,
+      y: height * 0.31,
+      db: Number(sensors.S2.avg_db),
+      name: "S2"
+    });
+  }
 
-if (sensors.S3?.avg_db != null) {
-  sensorPoints.push({
-    x: width * 0.65,
-    y: height * 0.73,
-    db: Number(sensors.S3.avg_db),
-    name: "S3"
-  });
-}
+  if (sensors.S3?.avg_db != null) {
+    sensorPoints.push({
+      x: width * 0.65,
+      y: height * 0.73,
+      db: Number(sensors.S3.avg_db),
+      name: "S3"
+    });
+  }
 
-// 2台未満なら等高線は作れない
-if (sensorPoints.length < 2) {
-  return;
-}
+  // 2台未満なら等高線は作れない
+  if (sensorPoints.length < 2) {
+    return;
+  }
 
   /*
     計算用グリッド。
@@ -299,9 +345,9 @@ if (sensorPoints.length < 2) {
 
   function colorForDb(value) {
 
-  // 70 dB未満：静か
-  if (value < 70) {
-    const t = Math.max(0, Math.min(1, (value - 50) / 20));
+  // 静か：緑
+  if (value <= 40) {
+    const t = Math.max(0, (value - 30) / 10);
 
     return [
       Math.round(205 - 65 * t),
@@ -310,24 +356,35 @@ if (sensorPoints.length < 2) {
     ];
   }
 
-  // 70〜80 dB未満：黄色
-  if (value < 80) {
-    const t = (value - 70) / 10;
+  // 40〜45：緑 → 黄
+  if (value <= 45) {
+    const t = (value - 40) / 5;
 
     return [
-      242,
-      Math.round(184 - 55 * t),
-      Math.round(75 - 10 * t)
+      Math.round(140 + 100 * t),
+      Math.round(225 - 20 * t),
+      Math.round(150 - 80 * t)
     ];
   }
 
-  // 80 dB以上：赤
-  const t = Math.min(1, (value - 80) / 10);
+  // 45〜50：黄 → オレンジ
+  if (value <= 50) {
+    const t = (value - 45) / 5;
+
+    return [
+      Math.round(240),
+      Math.round(205 - 80 * t),
+      Math.round(70 - 5 * t)
+    ];
+  }
+
+  // 50以上：オレンジ → 赤
+  const t = Math.min(1, (value - 50) / 10);
 
   return [
-    Math.round(239 - 14 * t),
-    Math.round(90 - 40 * t),
-    Math.round(88 - 8 * t)
+    Math.round(240 - 15 * t),
+    Math.round(125 - 75 * t),
+    Math.round(65 + 15 * t)
   ];
 }
 
@@ -630,6 +687,244 @@ if (contourStep > 0.001) {
       buildSeatMap();
       refresh();
       setInterval(refresh, 1000);
+
+      // ========================================
+      // Manager Page: passcode gate + notification log
+      // A fixed overlay panel, so it never resizes the map/grid layout.
+      // ========================================
+
+      const MANAGER_PASSCODE = "123456";
+      const MANAGER_SESSION_KEY = "silenceKeeperManager";
+
+      const managerBtn = document.getElementById("manager-btn");
+      const logToggleBtn = document.getElementById("log-toggle-btn");
+      const resetAssignmentsBtn = document.getElementById("reset-assignments-btn");
+      const managerLogoutBtn = document.getElementById("manager-logout-btn");
+      const passcodeModal = document.getElementById("passcode-modal");
+      const passcodeInput = document.getElementById("passcode-input");
+      const passcodeError = document.getElementById("passcode-error");
+      const passcodeSubmit = document.getElementById("passcode-submit");
+      const passcodeCancel = document.getElementById("passcode-cancel");
+      const notifyPanel = document.getElementById("notify-panel");
+      const notifyList = document.getElementById("notify-list");
+      const notifyClose = document.getElementById("notify-close");
+      const notifyClear = document.getElementById("notify-clear");
+      const confirmModal = document.getElementById("confirm-modal");
+      const confirmOk = document.getElementById("confirm-ok");
+      const confirmNo = document.getElementById("confirm-no");
+      const toastStack = document.getElementById("toast-stack");
+
+      let isManager = sessionStorage.getItem(MANAGER_SESSION_KEY) === "1";
+      let notifyTimer = null;
+      let lastSeenNotifyId = 0;
+      // Only ids newer than lastSeenNotifyId spawn a toast, once this is true -
+      // it stays false through the first fetch (even if that fetch is empty) so
+      // reopening/reloading the panel never replays existing alerts as toasts.
+      let notifyBaselineReady = false;
+
+      function syncManagerControls() {
+        logToggleBtn.classList.toggle("hidden", !isManager);
+        resetAssignmentsBtn.classList.toggle("hidden", !isManager);
+        managerLogoutBtn.classList.toggle("hidden", !isManager);
+      }
+
+      function openPasscodeModal() {
+        passcodeError.textContent = "";
+        passcodeInput.value = "";
+        passcodeModal.classList.remove("hidden");
+        passcodeInput.focus();
+      }
+
+      function closePasscodeModal() {
+        passcodeModal.classList.add("hidden");
+      }
+
+      function openConfirmModal() {
+        confirmModal.classList.remove("hidden");
+      }
+
+      function closeConfirmModal() {
+        confirmModal.classList.add("hidden");
+      }
+
+      async function clearNotifications() {
+        try {
+          await fetch("/api/notifications/clear", { method: "POST" });
+        } catch (error) {
+          console.error(error);
+        }
+        clearToasts();
+        fetchNotifications();
+      }
+
+      function renderNotifications(items) {
+        if (!items.length) {
+          notifyList.innerHTML = '<div class="notify-empty">No notifications yet.</div>';
+          return;
+        }
+        // Server already returns newest-first; new items simply appear at the top.
+        notifyList.innerHTML = items.map((item) => `
+          <div class="notify-item">
+            <span class="notify-msg">${item.message}</span>
+            <span class="notify-time">${item.time_text}</span>
+          </div>
+        `).join("");
+      }
+
+      function spawnToast(item) {
+        const toast = document.createElement("div");
+        toast.className = "toast";
+        toast.innerHTML = `
+          <p class="toast-msg">${item.message}</p>
+          <p class="toast-time">${item.time_text}</p>
+          <button class="toast-close" type="button" aria-label="Dismiss">&times;</button>
+        `;
+        toast.querySelector(".toast-close").addEventListener("click", () => {
+          toast.classList.add("leaving");
+          setTimeout(() => toast.remove(), 180);
+        });
+        // Newest goes on top; existing toasts shift down beneath it.
+        toastStack.prepend(toast);
+      }
+
+      function clearToasts() {
+        toastStack.innerHTML = "";
+      }
+
+      async function fetchNotifications() {
+        try {
+          const response = await fetch("/api/notifications", { cache: "no-store" });
+          const data = await response.json();
+          const items = data.notifications || [];
+          renderNotifications(items);
+
+          if (!notifyBaselineReady) {
+            // First fetch after login/reload: establish the baseline (even if
+            // there are zero notifications right now) without toasting history.
+            lastSeenNotifyId = items.length ? items[0].id : 0;
+            notifyBaselineReady = true;
+          } else if (items.length) {
+            const newItems = items.filter((item) => item.id > lastSeenNotifyId);
+            if (newItems.length) {
+              // Server returns newest-first; show toasts oldest-of-the-new first.
+              newItems.slice().reverse().forEach(spawnToast);
+              lastSeenNotifyId = items[0].id;
+            }
+          }
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function startPolling() {
+        if (!notifyTimer) {
+          fetchNotifications();
+          notifyTimer = setInterval(fetchNotifications, 2000);
+        }
+      }
+
+      function stopPolling() {
+        if (notifyTimer) {
+          clearInterval(notifyTimer);
+          notifyTimer = null;
+        }
+        lastSeenNotifyId = 0;
+        notifyBaselineReady = false;
+      }
+
+      function showNotifyPanel() {
+        notifyPanel.classList.remove("hidden");
+        fetchNotifications();
+      }
+
+      function hideNotifyPanel() {
+        notifyPanel.classList.add("hidden");
+      }
+
+      function toggleNotifyPanel() {
+        if (notifyPanel.classList.contains("hidden")) {
+          showNotifyPanel();
+        } else {
+          hideNotifyPanel();
+        }
+      }
+
+      function logoutManager() {
+        isManager = false;
+        sessionStorage.removeItem(MANAGER_SESSION_KEY);
+        hideNotifyPanel();
+        syncManagerControls();
+        stopPolling();
+        clearToasts();
+      }
+
+      managerBtn.addEventListener("click", () => {
+        if (isManager) {
+          showNotifyPanel();
+        } else {
+          openPasscodeModal();
+        }
+      });
+
+      passcodeCancel.addEventListener("click", closePasscodeModal);
+
+      passcodeSubmit.addEventListener("click", () => {
+        if (passcodeInput.value === MANAGER_PASSCODE) {
+          isManager = true;
+          sessionStorage.setItem(MANAGER_SESSION_KEY, "1");
+          closePasscodeModal();
+          syncManagerControls();
+          startPolling();
+          showNotifyPanel();
+        } else {
+          passcodeError.textContent = "Incorrect passcode.";
+        }
+      });
+
+      passcodeInput.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") passcodeSubmit.click();
+      });
+
+      notifyClose.addEventListener("click", hideNotifyPanel);
+      notifyClear.addEventListener("click", openConfirmModal);
+      confirmNo.addEventListener("click", closeConfirmModal);
+      confirmOk.addEventListener("click", () => {
+        closeConfirmModal();
+        clearNotifications();
+      });
+      logToggleBtn.addEventListener("click", toggleNotifyPanel);
+      managerLogoutBtn.addEventListener("click", logoutManager);
+
+      resetAssignmentsBtn.addEventListener("click", async () => {
+        const ok = confirm(
+          "Reset device assignments? All devices should be disconnected first."
+        );
+
+        if (!ok) return;
+
+        try {
+          const response = await fetch("/api/reset-assignments", {
+            method: "POST"
+          });
+
+          const data = await response.json();
+
+          if (data.ok) {
+            alert("Device assignments reset.");
+          } else {
+            alert("Reset failed.");
+          }
+        } catch (error) {
+          console.error(error);
+          alert("Reset failed.");
+        }
+      });
+
+      syncManagerControls();
+      if (isManager) {
+        startPolling();
+        showNotifyPanel();
+      }
     </script>
   </body>
 </html>
