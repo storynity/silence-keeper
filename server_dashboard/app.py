@@ -13,8 +13,8 @@ BASE_DIR = Path(__file__).resolve().parent
 
 WINDOW_SECONDS = 10
 OFFLINE_AFTER_SECONDS = 8
-QUIET_MAX_DB = 40.0
-LOUD_MIN_DB = 50.0
+QUIET_MAX_DB = 70.0
+LOUD_MIN_DB = 80.0
 
 # Exhibition table size. Adjust these to match the real display table.
 TABLE_WIDTH_CM = 180
