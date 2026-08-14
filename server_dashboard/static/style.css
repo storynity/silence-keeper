@@ -127,8 +127,7 @@ h2 { font-size: 21px; letter-spacing: 0; }
 
 .room-zone-s1 { left: 32%; top: 23%; width: 31%; height: 31%; }
 .room-zone-s2 { right: 2%; top: 23%; width: 34%; height: 31%; }
-.room-zone-s3 { left: 32%; bottom: 3%; width: 31%; height: 38%; }
-.room-zone-s4 { right: 2%; bottom: 3%; width: 34%; height: 38%; }
+.room-zone-s3 { left: 65%; transform: translateX(-50%);  bottom: 3%;  width: 34%;  height: 31%;}
 .seat-room.quiet { border-color: #6b9a8d; background: rgba(247, 251, 248, 0.96); }
 .seat-room.yellow { border-color: var(--yellow); background: rgba(255, 248, 225, 0.97); }
 .seat-room.red { border-color: var(--red); background: rgba(255, 232, 229, 0.97); animation: zone-alert 1.4s ease-in-out infinite; }
