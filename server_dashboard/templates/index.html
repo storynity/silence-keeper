@@ -74,6 +74,10 @@
             <canvas id="contour-canvas"></canvas>
             <div class="floorplan-title"><span>STUDY CAFE FLOOR PLAN</span><strong>Live seat conditions</strong></div>
 
+            <div class="sensor-marker sensor-marker-s1" aria-hidden="true"><span>S1</span></div>
+            <div class="sensor-marker sensor-marker-s2" aria-hidden="true"><span>S2</span></div>
+            <div class="sensor-marker sensor-marker-s3" aria-hidden="true"><span>S3</span></div>
+
             <div class="room room-restroom"><span>RESTROOM</span></div>
             <div class="room room-kiosk"><strong>KIOSK</strong><span>Seat selection</span><i></i></div>
             <div class="room room-storage"><span>Storage</span></div>
@@ -239,8 +243,8 @@ function renderContourMap(sensors) {
 
   if (sensors.S1?.avg_db != null) {
     sensorPoints.push({
-      x: width * 0.36,
-      y: height * 0.31,
+      x: width * 0.475,
+      y: height * 0.41,
       db: Number(sensors.S1.avg_db),
       name: "S1"
     });
@@ -248,8 +252,8 @@ function renderContourMap(sensors) {
 
   if (sensors.S2?.avg_db != null) {
     sensorPoints.push({
-      x: width * 0.78,
-      y: height * 0.31,
+      x: width * 0.81,
+      y: height * 0.41,
       db: Number(sensors.S2.avg_db),
       name: "S2"
     });
@@ -258,7 +262,7 @@ function renderContourMap(sensors) {
   if (sensors.S3?.avg_db != null) {
     sensorPoints.push({
       x: width * 0.65,
-      y: height * 0.73,
+      y: height * 0.82,
       db: Number(sensors.S3.avg_db),
       name: "S3"
     });
@@ -608,43 +612,10 @@ if (contourStep > 0.001) {
     ctx.stroke();
   }
 
-
-  // ========================================
-  // センサー位置を小さく表示
-  // ========================================
-
-  sensorPoints.forEach(
-    (sensor, index) => {
-
-      ctx.beginPath();
-
-      ctx.arc(
-        sensor.x,
-        sensor.y,
-        4,
-        0,
-        Math.PI * 2
-      );
-
-      ctx.fillStyle =
-        "rgba(50,60,60,0.7)";
-
-      ctx.fill();
-
-
-      ctx.font =
-        "bold 10px Arial";
-
-      ctx.fillStyle =
-        "rgba(50,60,60,0.78)";
-
-      ctx.fillText(
-        sensor.name,
-        sensor.x + 7,
-        sensor.y - 7
-      );
-    }
-  );
+  // Sensor device locations are marked by the .sensor-marker DOM elements
+  // (positioned in CSS to match these same coordinates) so they stay
+  // clearly visible above the seat grid instead of being drawn into the
+  // canvas, where they'd sit behind the seats.
 }
 
       function updateMap(map, tableWidthCm, tableDepthCm) {
